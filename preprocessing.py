@@ -1,3 +1,14 @@
+'''
+import pandas as pd
+from glob import glob
+stock_files = sorted(glob('data/data_*.csv')) #rename the data sets to get similar name so that we can iterate properly
+stock_files
+pd.concat((pd.read_csv(file).assign(filename = file)
+         for file in stock_files), ignore_index = True)
+# this is showing memory error in my laptop due to less ram storage, hopefully this will work in yours.
+'''
+
+
 import pandas as pd
 import numpy as np
 from sklearn import preprocessing
