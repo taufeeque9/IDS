@@ -23,7 +23,7 @@ X = new_data.drop([' Label'], axis=1, inplace=False) # dropping labels from new_
 X_new = X
 
 
-# converts the categorical data to numeric data for easier handling eg Destination Port to 1, Flow Duration 2 and so on...
+# converts the categorical data to numeric data for easier handling 
 labelEncoder = LabelEncoder() # creating an instance of label encoder, the methods will not get attached to it
 y = labelEncoder.fit_transform(y)
 for col in X.columns:
@@ -49,13 +49,14 @@ def preprocessing(X_new, y):
 
     # splitting the data in 80:20 train:test ratio
     xTrain, xTest, yTrain, yTest = train_test_split(norma_X_new, y, test_size = 0.2, random_state = 0)
-    
-    return xTrain, xTest, yTrain, yTest
 
-heheh = preprocessing(X_new, y)
-print(heheh)
+    # covnvert arrays into dataframes
+    xtrain = pd.DataFrame(xTrain)
+    xtest = pd.DataFrame(xTest)
+    ytrain = pd.DataFrame(yTrain)
+    ytest = pd.DataFrame(yTest)
+     
+    return xtrain, xtest, ytrain, ytest
 
-xtrain = pd.DataFrame(xTrain)
-xtest = pd.DataFrame(xTest)
-ytrain = pd.DataFrame(yTrain)
-ytest = pd.DataFrame(yTest)
+
+xTrainn, xTestt, yTrainn, yTestt = preprocessing(X_new, y)
