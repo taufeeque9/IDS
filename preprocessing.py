@@ -28,27 +28,44 @@ labelEncoder = LabelEncoder() # creating an instance of label encoder, the metho
 y = labelEncoder.fit_transform(y)
 for col in X.columns:
     X_new[col] = labelEncoder.fit_transform(X[col])
+
+Y = pd.DataFrame(y) # converting y into dataframe
     
-def preprocessing(X_new, y):
+def preprocessing(X_new, Y):
     import pandas as pd
     import numpy as np
     from sklearn import preprocessing
     from sklearn.preprocessing import LabelEncoder
-    from sklearn.model_selection import train_test_split
+    # from sklearn.model_selection import train_test_split
+    from sklearn.model_selection import StratifiedKFold
     # Normalizing all the features    
     norma_X_new = preprocessing.normalize(X_new)
-
     # OR
     # Standardizing all the features 
     # standardized_X_new = preprocessing.scale(X_new)
-
     np.set_printoptions(precision=3)
 
     # df = ids.sample(frac=1) # randomly shuffling the dataset to ensure uniformity
     # after normalizing, we'll split the dataset
 
+    # using stratified
+    skf = StratifiedKFold(n_splits=10, random_state=None)
+    skf.get_n_splits(X_new, Y)
+    
+    for train_index, test_index in skf.split(X_new, y):
+        print("Train:", train_index, "Validation:", test_index)
+        xTrain, xTest = X_new.iloc[train_index], X_new.iloc[test_index]
+        yTrain, yTest = Y.iloc[train_index], Y.iloc[test_index]
+        '''
+        accuracy=[]
+        classifier.fit(xTrain, yTrain)
+        prediction = classifier.predicted(xTest)
+        score = accuracy_score(prediction, yTest)
+        accuracy.append(score)
+        print(accuracy)
+        '''
     # splitting the data in 80:20 train:test ratio
-    xTrain, xTest, yTrain, yTest = train_test_split(norma_X_new, y, test_size = 0.2, random_state = 0)
+    # xTrain, xTest, yTrain, yTest = train_test_split(norma_X_new, y, test_size = 0.2, random_state = 0)
 
     # covnvert arrays into dataframes
     xtrain = pd.DataFrame(xTrain)
@@ -59,4 +76,4 @@ def preprocessing(X_new, y):
     return xtrain, xtest, ytrain, ytest
 
 
-xTrainn, xTestt, yTrainn, yTestt = preprocessing(X_new, y)
+xTrainn, xTestt, yTrainn, yTestt = preprocessing(X_new, Y)
