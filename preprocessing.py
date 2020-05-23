@@ -4,7 +4,7 @@ from glob import glob
 from sklearn import preprocessing
 from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
-
+from sklearn.preprocessing import StandardScaler
 
 def combine_csv():
     stock_files = sorted(glob('Dataset/*.pcap_ISCX.csv'))
@@ -39,7 +39,8 @@ def binary_label_encoder(y):
     '''
     converts multiclass labels to binary labels
     '''
-    pass
+    lb = preprocessing.LabelBinarizer()
+    return lb.fit_transform(y)
 
 
 def split_dataset(df):
@@ -47,6 +48,30 @@ def split_dataset(df):
     Takes a dataframe df and splits it in 0.7:0.15:0.15 ratio for training, cross-validation and test sets.
     '''
     pass
+
+
+
+def preprocessing(X, Y):
+    '''
+    Takes dataframes as inputs and outputs processed numpy arrays
+    '''
+    
+    ss = StandardScaler()
+    Xstd = ss.fit_transform(X) 
+    np.set_printoptions(precision=3)
+    
+    # using stratified
+    skf = StratifiedKFold(n_splits=10, random_state=None)
+    skf.get_n_splits(X, Y)
+
+    for train_index, test_index in skf.split(X, y):
+       # print("Train:", train_index, "Validation:", test_index)
+        xTrain, xTest = X.iloc[train_index], X.iloc[test_index]
+        yTrain, yTest = Y.iloc[train_index], Y.iloc[test_index]
+
+    return xTrain, xTest, yTrain, yTest
+
+xTrainn, xTestt, yTrainn, yTestt = preprocessing(X_new, Y)
 
 
 # y = new_data[[' Label']]  # adding labels to y
@@ -63,46 +88,27 @@ def split_dataset(df):
 # Y = pd.DataFrame(y)  # converting y into dataframe
 #
 #
-def preprocessing(X, Y):
-    '''
-    Takes dataframes as inputs and outputs processed numpy arrays
-    '''
-    # Normalizing all the features
-    norma_X = preprocessing.normalize(X)
-    # OR
-    # Standardizing all the features
-    # standardized_X = preprocessing.scale(X)
-    np.set_printoptions(precision=3)
+# Normalizing all the features
+# norma_X = preprocessing.normalize(X)
+# OR
+# Standardizing all the features
+# standardized_X = preprocessing.scale(X)
+# df = ids.sample(frac=1) # randomly shuffling the dataset to ensure uniformity
+# after normalizing, we'll split the dataset
 
-    # df = ids.sample(frac=1) # randomly shuffling the dataset to ensure uniformity
-    # after normalizing, we'll split the dataset
+'''
+accuracy=[]
+classifier.fit(xTrain, yTrain)
+prediction = classifier.predicted(xTest)
+score = accuracy_score(prediction, yTest)
+accuracy.append(score)
+print(accuracy)
+'''
+# splitting the data in 80:20 train:test ratio
+# xTrain, xTest, yTrain, yTest = train_test_split(norma_X, y, test_size = 0.2, random_state = 0)
 
-    # using stratified
-    skf = StratifiedKFold(n_splits=10, random_state=None)
-    skf.get_n_splits(X, Y)
-
-    for train_index, test_index in skf.split(X, y):
-        print("Train:", train_index, "Validation:", test_index)
-        xTrain, xTest = X.iloc[train_index], X.iloc[test_index]
-        yTrain, yTest = Y.iloc[train_index], Y.iloc[test_index]
-        '''
-        accuracy=[]
-        classifier.fit(xTrain, yTrain)
-        prediction = classifier.predicted(xTest)
-        score = accuracy_score(prediction, yTest)
-        accuracy.append(score)
-        print(accuracy)
-        '''
-    # splitting the data in 80:20 train:test ratio
-    # xTrain, xTest, yTrain, yTest = train_test_split(norma_X, y, test_size = 0.2, random_state = 0)
-
-    # covnvert arrays into dataframes
-    xtrain = pd.DataFrame(xTrain)
-    xtest = pd.DataFrame(xTest)
-    ytrain = pd.DataFrame(yTrain)
-    ytest = pd.DataFrame(yTest)
-
-    return xtrain, xtest, ytrain, ytest
-
-
-xTrainn, xTestt, yTrainn, yTestt = preprocessing(X_new, Y)
+# covnvert arrays into dataframes
+# xtrain = pd.DataFrame(xTrain)
+# xtest = pd.DataFrame(xTest)
+# ytrain = pd.DataFrame(yTrain)
+# ytest = pd.DataFrame(yTest)
