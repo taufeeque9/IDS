@@ -8,10 +8,10 @@ import os
 
 
 def combine_csv():
-    stock_files = sorted(glob('Dataset/*.pcap_ISCX.csv'))
-    ids = pd.read_csv(stock_files[0])
-    for i in range(1, len(stock_files)):
-        dfi = pd.read_csv(stock_files[i])
+    data_files = sorted(glob('Dataset/*.pcap_ISCX.csv'))
+    ids = pd.read_csv(data_files[0])
+    for i in range(1, len(data_files)):
+        dfi = pd.read_csv(data_files[i])
         dfi.dropna(axis=0, how='any', inplace=True)
         ids = pd.concat((ids, dfi), ignore_index=True)
 
