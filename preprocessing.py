@@ -2,9 +2,10 @@ import pandas as pd
 import numpy as np
 from glob import glob
 from sklearn import preprocessing
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import StandardScaler
+import os
+
 
 def combine_csv():
     stock_files = sorted(glob('Dataset/*.pcap_ISCX.csv'))
@@ -21,7 +22,8 @@ def combine_csv():
 
 
 def resize_dataset():
-    ids = pd.read_csv('./Dataset/combined_data.csv')
+    ids = pd.read_csv('./Dataset/combined_data.csv',
+                      dtype={'Flow Bytes/s': str, ' Flow Packets/s': str})
     labels_to_drop = {'BENIGN': 0.1, 'DoS Hulk': 0.3, 'DDoS': 0.3, 'PortScan': 0.3}
     for label in labels_to_drop:
         df = ids.loc[ids[' Label'] == label]
@@ -29,9 +31,13 @@ def resize_dataset():
         df = df.sample(frac=labels_to_drop[label])
         ids = pd.concat((ids, df), ignore_index=True)
 
-    ids = ids.sample(frac=1)
+    ids = ids.sample(frac=1, random_state=42)
     ids.reset_index(drop=True, inplace=True)
-    # ids.to_csv('./Dataset/resized_data.csv')
+    ids['Flow Bytes/s'] = ids['Flow Bytes/s'].str.strip()
+    ids[' Flow Packets/s'] = ids[' Flow Packets/s'].str.strip()
+    ids = ids.astype({'Flow Bytes/s': float, ' Flow Packets/s': float})
+    ids.columns = ids.columns.str.strip()
+    ids.to_csv('Dataset/resized_data.csv', index=False)
     return ids
 
 
@@ -39,76 +45,46 @@ def binary_label_encoder(y):
     '''
     converts multiclass labels to binary labels
     '''
-    lb = preprocessing.LabelBinarizer()
-    return lb.fit_transform(y)
+    y["BinaryLabel"] = (y["Label"] != 'BENIGN').astype(int)
+
+    return y
 
 
 def split_dataset(df):
     '''
     Takes a dataframe df and splits it in 0.7:0.15:0.15 ratio for training, cross-validation and test sets.
     '''
-    pass
+    split = StratifiedShuffleSplit(n_splits=1, test_size=0.15, random_state=42)
+    for train_index, test_index in split.split(df, df['BinaryLabel']):
+        train = df.loc[train_index]
+        test = df.loc[test_index]
+
+    for train_index, cv_index in split.split(train, train['BinaryLabel']):
+        train = df.loc[train_index]
+        cv = df.loc[cv_index]
+
+    return train, cv, test
 
 
-
-def preprocessing(X, Y):
+def preprocessing(X):
     '''
     Takes dataframes as inputs and outputs processed numpy arrays
     '''
-    
+
     ss = StandardScaler()
-    Xstd = ss.fit_transform(X) 
-    np.set_printoptions(precision=3)
-    
-    # using stratified
-    skf = StratifiedKFold(n_splits=10, random_state=None)
-    skf.get_n_splits(X, Y)
+    Xstd = ss.fit_transform(X)
+    # np.set_printoptions(precision=3)
 
-    for train_index, test_index in skf.split(X, y):
-       # print("Train:", train_index, "Validation:", test_index)
-        xTrain, xTest = X.iloc[train_index], X.iloc[test_index]
-        yTrain, yTest = Y.iloc[train_index], Y.iloc[test_index]
-
-    return xTrain, xTest, yTrain, yTest
-
-xTrainn, xTestt, yTrainn, yTestt = preprocessing(X_new, Y)
+    return Xstd
 
 
-# y = new_data[[' Label']]  # adding labels to y
-# X = new_data.drop([' Label'], axis=1, inplace=False)  # dropping labels from new_data to form X
-# X_new = X
-#
-#
-# # converts the categorical data to numeric data for easier handling
-# labelEncoder = LabelEncoder()  # creating an instance of label encoder, the methods will not get attached to it
-# y = labelEncoder.fit_transform(y)
-# for col in X.columns:
-#     X_new[col] = labelEncoder.fit_transform(X[col])
-#
-# Y = pd.DataFrame(y)  # converting y into dataframe
-#
-#
-# Normalizing all the features
-# norma_X = preprocessing.normalize(X)
-# OR
-# Standardizing all the features
-# standardized_X = preprocessing.scale(X)
-# df = ids.sample(frac=1) # randomly shuffling the dataset to ensure uniformity
-# after normalizing, we'll split the dataset
+def main():
+    if not os.path.isfile('Dataset/combined_data.csv'):
+        combine_csv()
+    if not os.path.isfile('Dataset/resized_data.csv'):
+        resize_dataset()
 
-'''
-accuracy=[]
-classifier.fit(xTrain, yTrain)
-prediction = classifier.predicted(xTest)
-score = accuracy_score(prediction, yTest)
-accuracy.append(score)
-print(accuracy)
-'''
-# splitting the data in 80:20 train:test ratio
-# xTrain, xTest, yTrain, yTest = train_test_split(norma_X, y, test_size = 0.2, random_state = 0)
+    df = pd.read_csv('Dataset/resized_data.csv')
 
-# covnvert arrays into dataframes
-# xtrain = pd.DataFrame(xTrain)
-# xtest = pd.DataFrame(xTest)
-# ytrain = pd.DataFrame(yTrain)
-# ytest = pd.DataFrame(yTest)
+    df = binary_label_encoder(df)
+    train, cv, test = split_dataset(df)
