@@ -75,7 +75,6 @@ def main():
     if not os.path.isfile('Dataset/resized_data.csv'):
         resize_dataset()
 
-    df = pd.read_csv('Dataset/resized_data.csv')
 
-    df = binary_label_encoder(df)
-    train, cv, test = split_dataset(df)
+if __name__ == "__main__":
+    main()
