@@ -37,6 +37,9 @@ def resize_dataset():
     ids[' Flow Packets/s'] = ids[' Flow Packets/s'].str.strip()
     ids = ids.astype({'Flow Bytes/s': float, ' Flow Packets/s': float})
     ids.columns = ids.columns.str.strip()
+    ids.dropna(inplace=True)
+    indices_to_keep = ~ids.isin([np.nan, np.inf, -np.inf]).any(axis=1)
+    ids = ids[indices_to_keep]
     ids.to_csv('Dataset/resized_data.csv', index=False)
     return ids
 
@@ -64,18 +67,6 @@ def split_dataset(df):
         cv = df.loc[cv_index]
 
     return train, cv, test
-
-
-def preprocessing(X):
-    '''
-    Takes dataframes as inputs and outputs processed numpy arrays
-    '''
-
-    ss = StandardScaler()
-    Xstd = ss.fit_transform(X)
-    # np.set_printoptions(precision=3)
-
-    return Xstd
 
 
 def main():

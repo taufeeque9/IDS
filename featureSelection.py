@@ -1,27 +1,26 @@
 import pandas as pd
 import numpy as np
-import seaborn as sns
 from sklearn.feature_selection import SelectKBest
+from sklearn.preprocessing import MinMaxScaler
 from sklearn.feature_selection import chi2
-from sklearn.preprocessing import LabelEncoder
+from preprocessing import binary_label_encoder, split_dataset
 
-dataset = pd.read_csv("MachineLearningCVE/Friday-WorkingHours-Afternoon-PortScan.pcap_ISCX.csv")
+dataset = pd.read_csv("Dataset/resized_data.csv")
+dataset = binary_label_encoder(dataset)
+train, cv, test = split_dataset(dataset)
 
-# print(dataset.isnull().sum())
-new_data = dataset.dropna(axis=0, how='any', inplace=False)
 
-y = new_data[[' Label']]
-X = new_data.drop([' Label'], axis=1, inplace=False)
+y = train[['BinaryLabel']]
+X = train.drop(['Label', 'BinaryLabel'], axis=1, inplace=False)
+cols = X.columns.tolist()
+mm_scaler = MinMaxScaler()
 X_new = X
+X_new[cols] = mm_scaler.fit_transform(X[cols])
+y = y['BinaryLabel'].values
 
-labelEncoder = LabelEncoder()
-y = labelEncoder.fit_transform(y)
-for col in X.columns:
-    X_new[col] = labelEncoder.fit_transform(X[col])
 
 # Features needed can be changed below to get the top 'k'
 # features for model training
-
 features_needed = 15
 
 ######################################################################
