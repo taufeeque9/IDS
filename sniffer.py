@@ -6,11 +6,41 @@ import  time
 import struct
 import binascii
 
+MY_IP = socket.gethostbyname(socket.gethostname())
+#Tou can try socket.getfqdn() if the above method gives '127.0.0.1'
+
+lock = threading.Lock()
 
 class Flow:
-    pass
+    def __init__(self, identity, src_ip, flags, timer, data_length):
+        self.state = True  #connection open/active
+        self.identity = identity
+        self.port = (identity[0][1] if (identity[0][0] == MY_IP) else identity[1][1])
+        self.fwd = src_ip  #ip of initiator
+        self.num_packets = 1
+        self.start_time = timer
+        self.total_data_length = self.fwd_data_length = data_length
+        self.bwd_data_length = 0
+        self.fwd_fin = bool(flags & 1)
+        self.bwd_fin = False
+
+    def add_packet(self, identity, src_ip, flags, timer, data_length):
+        if (self.fwd_fin and self.bwd_fin):
+            self.state = False  #connection closed
+
+        self.num_packets += 1
+        self.total_data_length += data_length
+
+        if src_ip == self.fwd:
+            self.fwd_data_length += data_length
+            self.fwd_fin = (self.fwd_fin or bool(flags & 1))
+
+        else:
+            self.bwd_data_length += data_length
+            self.bwd_fin = (self.bwd_fin or bool(flags & 1))       
 
 FLOWS = {}    #can map (ip1,port1,ip2,port2) to list of Flow objects
+
 class Sniffer:
     def __init__(self):
 
@@ -33,7 +63,7 @@ class Sniffer:
                 packet = self.sock.recvfrom(2048)
                 timer = time.time() - self.starttime
 
-                if packet[1][0] != 'lo':
+                if packet[1][0] != 'lo':   #Don't need to sniff local interface for malicious packets(??)
                     t = threading.Thread(target=self.preprocessing,args=(packet[0],timer))
                     t.start()
                     self.threads.append(t)
@@ -41,9 +71,14 @@ class Sniffer:
         except KeyboardInterrupt:   #break the loop , close and dump all data into file
             print("\nKeyboard Interrupt! Closing socket")
             self.sock.close()
+            print("Flows")
 
             for thread in self.threads:
                 thread.join()
+
+            for identity in FLOWS:
+                for flow in FLOWS[identity]:
+                    print(flow.identity, flow.fwd, flow.num_packets, flow.total_data_length, ("Open" if flow.state else "Closed"))
 
             if __name__ == '__main__':
                 sys.exit()
@@ -77,8 +112,23 @@ class Sniffer:
 
                 data_length = len(packet[(14 + ip_header_length + tcp_header_length) :])
 
-                print(identity , format(flags ,'b').zfill(8) , data_length , timer)
+                print(identity , format(flags ,'b').zfill(8) , data_length , timer, ("Incoming" if (source_ip == MY_IP) else "Outgoing"))
 
+                lock.acquire()
+
+                if identity in FLOWS:
+                    for flow in FLOWS[identity]:
+                        if flow.state: #flow is active
+                            flow.add_packet(identity, source_ip, flags, timer, data_length)
+                            break
+
+                    else:
+                        FLOWS[identity].append(Flow(identity, source_ip, flags, timer, data_length))
+
+                else:
+                    FLOWS[identity] = [Flow(identity, source_ip, flags, timer, data_length),]
+
+                lock.release()
 
 if __name__ == '__main__':
     sniff = Sniffer()
