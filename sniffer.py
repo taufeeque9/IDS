@@ -5,38 +5,95 @@ import threading
 import  time
 import struct
 import binascii
+import os
+import numpy as np
 
-MY_IP = socket.gethostbyname(socket.gethostname())
+MY_IP = [socket.gethostbyname(socket.gethostname()),]
 #Tou can try socket.getfqdn() if the above method gives '127.0.0.1'
+
+if system() == 'Linux':
+    MY_IP = set()
+    stream = os.popen('ifconfig')
+    ifconfig = stream.read()
+
+    ifconfig = (ifconfig.split('\n\n'))[:-1]
+    for i in range(len(ifconfig)):
+        ifconfig[i] = ifconfig[i].split('\n' + ' '*8)
+
+        for j in range(len(ifconfig[i])):
+            ifconfig[i][j] = ifconfig[i][j].split()
+
+        if (ifconfig[i][0][0] != 'lo:') and (ifconfig[i][1][0] == 'inet'):
+            MY_IP.add(ifconfig[i][1][1])        
+
+print(MY_IP)
 
 lock = threading.Lock()
 
 class Flow:
-    def __init__(self, identity, src_ip, flags, timer, data_length):
+    def __init__(self, identity, src_ip, flags, timer, packet_length, segment_length):
         self.state = True  #connection open/active
         self.identity = identity
-        self.port = (identity[0][1] if (identity[0][0] == MY_IP) else identity[1][1])
+        self.port = (identity[0][1] if (identity[0][0] in MY_IP) else identity[1][1])
         self.fwd = src_ip  #ip of initiator
+        
         self.num_packets = 1
+        self.num_packets_forward = 1
+        self.num_packets_backward = 0
+        
         self.start_time = timer
-        self.total_data_length = self.fwd_data_length = data_length
-        self.bwd_data_length = 0
+        
+        self.flow_duration = 0
+        self.total_segment_length = self.fwd_segment_length = segment_length
+        self.bwd_segment_length = 0
+        
         self.fwd_fin = bool(flags & 1)
         self.bwd_fin = False
+        self.psh_flag_count = (flags & (1 << 3))
 
-    def add_packet(self, identity, src_ip, flags, timer, data_length):
+        self.flow_IAT_Max, self.prev_timer = 0 , timer
+
+        self.Fwd_IAT = [timer,]
+        self.Fwd_IAT_Max = 0
+        self.Fwd_IAT_total = 0
+        self.Fwd_IAT_std = 0
+
+        self.packet_length = [packet_length,]
+        self.bwd_packet_length = []
+        self.packet_length_std = 0
+        self.packet_length_var = 0
+        self.bwd_packet_length_max = 0
+        self.bwd_packet_length_mean = 0
+        self.bwd_packet_length_std = 0
+
+        self.avg_bwd_segment_size = 0
+
+    def add_packet(self, identity, src_ip, flags, timer, packet_length, segment_length):
         if (self.fwd_fin and self.bwd_fin):
             self.state = False  #connection closed
 
         self.num_packets += 1
-        self.total_data_length += data_length
+        self.total_segment_length += segment_length
+        self.packet_length.append(packet_length)
+
+        self.flow_duration = (timer - self.start_time) * 1e6
+
+        self.psh_flag_count = (flags & (1 << 3))
+
+        self.flow_IAT_Max = max(self.flow_IAT_Max, (timer - self.prev_timer)*1e6)
+        self.prev_timer = timer
 
         if src_ip == self.fwd:
-            self.fwd_data_length += data_length
+            self.num_packets_forward += 1
+            self.fwd_segment_length += segment_length
             self.fwd_fin = (self.fwd_fin or bool(flags & 1))
+            self.Fwd_IAT.append((timer - self.Fwd_IAT[-1]))
 
         else:
-            self.bwd_data_length += data_length
+            self.bwd_packet_length.append(packet_length)
+            self.num_packets_backward += 1
+            self.bwd_segment_length += segment_length
+            self.avg_bwd_segment_size = (self.bwd_segment_length / self.num_packets_backward)
             self.bwd_fin = (self.bwd_fin or bool(flags & 1))       
 
 FLOWS = {}    #can map (ip1,port1,ip2,port2) to list of Flow objects
@@ -78,7 +135,20 @@ class Sniffer:
 
             for identity in FLOWS:
                 for flow in FLOWS[identity]:
-                    print(flow.identity, flow.fwd, flow.num_packets, flow.total_data_length, ("Open" if flow.state else "Closed"))
+
+                    flow.Fwd_IAT_Max = max(flow.Fwd_IAT)
+                    flow.Fwd_IAT_std = np.std(flow.Fwd_IAT)
+                    flow.Fwd_IAT_total = np.sum(flow.Fwd_IAT)
+
+                    flow.packet_length_std = np.std(flow.packet_length)
+                    flow.packet_length_var = flow.packet_length_std * flow.packet_length_std
+
+                    if flow.bwd_packet_length:
+                        flow.bwd_packet_length_max = max(flow.bwd_packet_length)
+                        flow.bwd_packet_length_mean = np.mean(flow.bwd_packet_length)
+                        flow.bwd_packet_length_std = np.std(flow.bwd_packet_length)
+                        
+                    print(flow.identity, flow.fwd, flow.num_packets, flow.total_segment_length, ("Open" if flow.state else "Closed"))
 
             if __name__ == '__main__':
                 sys.exit()
@@ -111,22 +181,24 @@ class Sniffer:
                 flags = tcp_header[5]
 
                 data_length = len(packet[(14 + ip_header_length + tcp_header_length) :])
+                segment_length = tcp_header_length + data_length
+                packet_length = ip_header_length + segment_length
 
-                print(identity , format(flags ,'b').zfill(8) , data_length , timer, ("Incoming" if (source_ip == MY_IP) else "Outgoing"))
+                print(identity , format(flags ,'b').zfill(8) , data_length , timer, ("Incoming" if (source_ip in MY_IP) else "Outgoing"))
 
                 lock.acquire()
 
                 if identity in FLOWS:
                     for flow in FLOWS[identity]:
                         if flow.state: #flow is active
-                            flow.add_packet(identity, source_ip, flags, timer, data_length)
+                            flow.add_packet(identity, source_ip, flags, timer, packet_length, segment_length)
                             break
 
                     else:
-                        FLOWS[identity].append(Flow(identity, source_ip, flags, timer, data_length))
+                        FLOWS[identity].append(Flow(identity, source_ip, flags, timer, packet_length, segment_length))
 
                 else:
-                    FLOWS[identity] = [Flow(identity, source_ip, flags, timer, data_length),]
+                    FLOWS[identity] = [Flow(identity, source_ip, flags, timer, packet_length, segment_length),]
 
                 lock.release()
 
