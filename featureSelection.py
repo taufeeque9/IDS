@@ -5,19 +5,27 @@ from sklearn.preprocessing import MinMaxScaler
 from sklearn.feature_selection import chi2
 from preprocessing import binary_label_encoder, split_dataset
 
+
+def get_x_y(df):
+    y = train[['BinaryLabel']]
+    X = train.drop(['Label', 'BinaryLabel'], axis=1, inplace=False)
+    y = y['BinaryLabel'].values
+    return X, y
+
+
 dataset = pd.read_csv("Dataset/resized_data.csv")
 dataset = binary_label_encoder(dataset)
 train, cv, test = split_dataset(dataset)
 
-
-y = train[['BinaryLabel']]
-X = train.drop(['Label', 'BinaryLabel'], axis=1, inplace=False)
-cols = X.columns.tolist()
+X_train, y_train = get_x_y(train)
+cols = X_train.columns.tolist()
 mm_scaler = MinMaxScaler()
-X_new = X
-X_new[cols] = mm_scaler.fit_transform(X[cols])
-y = y['BinaryLabel'].values
+X_new = X_train
+X_new[cols] = mm_scaler.fit_transform(X_train[cols])
 
+
+X_cv, y_cv = get_x_y(cv)
+X_cv[cols] = mm_scaler.transform(X_cv[cols])
 
 # Features needed can be changed below to get the top 'k'
 # features for model training
