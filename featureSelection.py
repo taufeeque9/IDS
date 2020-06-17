@@ -29,7 +29,7 @@ X_cv[cols] = mm_scaler.transform(X_cv[cols])
 
 # Features needed can be changed below to get the top 'k'
 # features for model training
-features_needed = 15
+features_needed = 30
 
 ######################################################################
 
