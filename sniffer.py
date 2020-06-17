@@ -34,7 +34,7 @@ class Flow:
     def __init__(self, identity, src_ip, flags, timer, packet_length, segment_length):
         self.state = True  #connection open/active
         self.identity = identity
-        self.port = (identity[0][1] if (identity[0][0] in MY_IP) else identity[1][1])
+        self.destination_port = (identity[0][1] if (identity[0][0] in MY_IP) else identity[1][1])
         self.fwd = src_ip  #ip of initiator
         
         self.num_packets = 1
@@ -46,10 +46,12 @@ class Flow:
         self.flow_duration = 0
         self.total_segment_length = self.fwd_segment_length = segment_length
         self.bwd_segment_length = 0
+        self.avg_bwd_segment_size = 0
         
         self.fwd_fin = bool(flags & 1)
         self.bwd_fin = False
-        self.psh_flag_count = (flags & (1 << 3))
+        self.psh_flag_count = ((flags >> 3) & 1)
+        self.urg_flag_count = ((flags >> 5) & 1)
 
         self.flow_IAT_Max, self.prev_timer = 0 , timer
 
@@ -60,13 +62,14 @@ class Flow:
 
         self.packet_length = [packet_length,]
         self.bwd_packet_length = []
+        self.max_packet_length = 0
+        self.packet_length_mean = 0
         self.packet_length_std = 0
         self.packet_length_var = 0
         self.bwd_packet_length_max = 0
         self.bwd_packet_length_mean = 0
         self.bwd_packet_length_std = 0
 
-        self.avg_bwd_segment_size = 0
 
     def add_packet(self, identity, src_ip, flags, timer, packet_length, segment_length):
         if (self.fwd_fin and self.bwd_fin):
@@ -76,11 +79,12 @@ class Flow:
         self.total_segment_length += segment_length
         self.packet_length.append(packet_length)
 
-        self.flow_duration = (timer - self.start_time) * 1e6
+        self.flow_duration = (timer - self.start_time)
 
-        self.psh_flag_count = (flags & (1 << 3))
+        self.psh_flag_count += ((flags >> 3) & 1)
+        self.urg_flag_count += ((flags >> 5) & 1)
 
-        self.flow_IAT_Max = max(self.flow_IAT_Max, (timer - self.prev_timer)*1e6)
+        self.flow_IAT_Max = max(self.flow_IAT_Max, (timer - self.prev_timer))
         self.prev_timer = timer
 
         if src_ip == self.fwd:
@@ -140,6 +144,8 @@ class Sniffer:
                     flow.Fwd_IAT_std = np.std(flow.Fwd_IAT)
                     flow.Fwd_IAT_total = np.sum(flow.Fwd_IAT)
 
+                    flow.packet_length_mean = np.mean(flow.packet_length)
+                    flow.max_packet_length = max(flow.packet_length)
                     flow.packet_length_std = np.std(flow.packet_length)
                     flow.packet_length_var = flow.packet_length_std * flow.packet_length_std
 
