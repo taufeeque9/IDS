@@ -57,16 +57,21 @@ def split_dataset(df):
     '''
     Takes a dataframe df and splits it in 0.7:0.15:0.15 ratio for training, cross-validation and test sets.
     '''
-    split = StratifiedShuffleSplit(n_splits=1, test_size=0.3, random_state=42)
-    for train_index, test_index in split.split(df, df['BinaryLabel']):
+
+    split1 = StratifiedShuffleSplit(n_splits=1, test_size=0.3, random_state=42)
+    for train_index, test0_index in split1.split(df, df['BinaryLabel']):
         train = df.loc[train_index]
-        test = df.loc[test_index]
+        test0 = df.loc[test0_index]
 
-    split = StratifiedShuffleSplit(n_splits=1, test_size=0.5, random_state=42)
-    for test_index, cv_index in split.split(test, test['BinaryLabel']):
-        test = df.loc[train_index]
-        cv = df.loc[cv_index]
+    train.reset_index(drop=True, inplace=True)
+    test0.reset_index(drop=True, inplace=True)
+    split2 = StratifiedShuffleSplit(n_splits=1, test_size=0.5, random_state=42)
+    for test_index, cv_index in split2.split(test0, test0['BinaryLabel']):
+        test = test0.loc[test_index]
+        cv = test0.loc[cv_index]
 
+    test.reset_index(drop=True, inplace=True)
+    cv.reset_index(drop=True, inplace=True)
     return train, cv, test
 
 

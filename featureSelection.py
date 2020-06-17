@@ -7,8 +7,8 @@ from preprocessing import binary_label_encoder, split_dataset
 
 
 def get_x_y(df):
-    y = train[['BinaryLabel']]
-    X = train.drop(['Label', 'BinaryLabel'], axis=1, inplace=False)
+    y = df[['BinaryLabel']]
+    X = df.drop(['Label', 'BinaryLabel'], axis=1, inplace=False)
     y = y['BinaryLabel'].values
     return X, y
 
@@ -17,11 +17,11 @@ dataset = pd.read_csv("Dataset/resized_data.csv")
 dataset = binary_label_encoder(dataset)
 train, cv, test = split_dataset(dataset)
 
+
 X_train, y_train = get_x_y(train)
 cols = X_train.columns.tolist()
 mm_scaler = MinMaxScaler()
-X_new = X_train
-X_new[cols] = mm_scaler.fit_transform(X_train[cols])
+X_train[cols] = mm_scaler.fit_transform(X_train[cols])
 
 
 X_cv, y_cv = get_x_y(cv)
@@ -52,7 +52,7 @@ def cor_selector(X, y, num_feats):
     return cor_support, cor_feature
 
 
-cor_support, cor_feature = cor_selector(X_new, y, features_needed)
+cor_support, cor_feature = cor_selector(X_train, y_train, features_needed)
 print(str(len(cor_feature)), 'selected features')
 print(cor_feature)
 
@@ -61,13 +61,13 @@ print(cor_feature)
 print("Selection based on chi square distibution")
 
 chi_selector = SelectKBest(chi2, k=features_needed)
-X_kbest_features = chi_selector.fit_transform(X_new, y)
+X_kbest_features = chi_selector.fit_transform(X_train, y_train)
 chi_support = chi_selector.get_support()
-chi_feature = X_new.loc[:, chi_support].columns.tolist()
+chi_feature = X_train.loc[:, chi_support].columns.tolist()
 print(str(len(chi_feature)), 'selected features')
 print(chi_feature)
 
-
+del dataset
 # # More Raw Approach - Leaving the first 2 valued and
 # # last NaN valued features, all other features are
 # # dependent and can be considered for training
