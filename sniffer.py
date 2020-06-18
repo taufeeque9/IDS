@@ -108,14 +108,17 @@ class Sniffer:
         self.threads = []
         try:
             if(system() == 'Windows'):
-                self.sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.ntohs(0x0003))
+                self.sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
+                self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
+                self.sock.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
+
             elif (system() == 'Linux'):
                 self.sock = socket.socket(socket.PF_PACKET, socket.SOCK_RAW, socket.ntohs(0x0003))
 
             self.starttime = time.time()
 
         except socket.error as msg:
-            print("Socket could not be created. Error :",msg)
+            print("Socket could not be created. Error :", msg)
             if(__name__ == '__main__'):
                 sys.exit()
 
@@ -131,7 +134,11 @@ class Sniffer:
 
         except KeyboardInterrupt:   #break the loop , close and dump all data into file
             print("\nKeyboard Interrupt! Closing socket")
+
+            if system() == 'Windows':
+                self.sock.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
             self.sock.close()
+            
             print("Flows")
 
             for thread in self.threads:
