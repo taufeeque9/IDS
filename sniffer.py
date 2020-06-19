@@ -31,7 +31,11 @@ print(MY_IP)
 lock = threading.Lock()
 
 class Flow:
-    def __init__(self, identity, src_ip, flags, timer, packet_length, segment_length):
+    def __init__(self, flow_id, identity, src_ip, flags, timer, packet_length, segment_length):
+        self.timestamp = time.ctime()
+        self.flow_id = flow_id
+        self.features = []
+
         self.state = True  #connection open/active
         self.identity = identity
         self.destination_port = (identity[0][1] if (identity[0][0] in MY_IP) else identity[1][1])
@@ -98,14 +102,39 @@ class Flow:
             self.num_packets_backward += 1
             self.bwd_segment_length += segment_length
             self.avg_bwd_segment_size = (self.bwd_segment_length / self.num_packets_backward)
-            self.bwd_fin = (self.bwd_fin or bool(flags & 1))       
+            self.bwd_fin = (self.bwd_fin or bool(flags & 1))
+
+    def find_features(self):
+        self.Fwd_IAT_Max = max(self.Fwd_IAT)
+        self.Fwd_IAT_std = np.std(self.Fwd_IAT)
+        self.Fwd_IAT_total = np.sum(self.Fwd_IAT)
+
+        self.packet_length_mean = np.mean(self.packet_length)
+        self.max_packet_length = max(self.packet_length)
+        self.packet_length_std = np.std(self.packet_length)
+        self.packet_length_var = self.packet_length_std * self.packet_length_std
+
+        if self.bwd_packet_length:
+            self.bwd_packet_length_max = max(self.bwd_packet_length)
+            self.bwd_packet_length_mean = np.mean(self.bwd_packet_length)
+            self.bwd_packet_length_std = np.std(self.bwd_packet_length)
+
+        self.features = [self.destination_port, self.flow_duration, self.bwd_packet_length_max, self.bwd_packet_length_mean]
+        self.features = self.features + [self.bwd_packet_length_std, self.flow_IAT_Max, self.Fwd_IAT_total, self.Fwd_IAT_std]
+        self.features = self.features + [self.Fwd_IAT_Max, self.max_packet_length, self.packet_length_mean, self.packet_length_std]
+        self.features = self.features + [self.packet_length_var, self.psh_flag_count, self.urg_flag_count, self.avg_bwd_segment_size]
+
 
 FLOWS = {}    #can map (ip1,port1,ip2,port2) to list of Flow objects
 
 class Sniffer:
     def __init__(self):
+        sniffer_thread = threading.current_thread()
+        sniffer_thread.alive = True
 
         self.threads = []
+        self.n_flows = 0  #will help in assigning flow IDs
+        
         try:
             if (system() == 'Windows'):
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
@@ -124,7 +153,7 @@ class Sniffer:
                 sys.exit()
 
         try:
-            while 1:
+            while sniffer_thread.alive:
                 packet = self.sock.recvfrom(2048)
                 timer = time.time() - self.starttime
 
@@ -133,6 +162,24 @@ class Sniffer:
                     t.start()
                     self.threads.append(t)
 
+            if system() == 'Windows':
+                self.sock.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
+            
+            self.sock.close()
+            
+            print("Flows")
+
+            for thread in self.threads:
+                thread.join()
+
+            for identity in FLOWS:
+                for flow in FLOWS[identity]:
+                    flow.find_features()
+                        
+                    print(flow.flow_id, flow.identity, flow.fwd, flow.num_packets, flow.total_segment_length, ("Open" if flow.state else "Closed"))
+
+            if __name__ == '__main__':
+                sys.exit()
         except KeyboardInterrupt:   #break the loop , close and dump all data into file
             print("\nKeyboard Interrupt! Closing socket")
 
@@ -147,27 +194,14 @@ class Sniffer:
 
             for identity in FLOWS:
                 for flow in FLOWS[identity]:
-
-                    flow.Fwd_IAT_Max = max(flow.Fwd_IAT)
-                    flow.Fwd_IAT_std = np.std(flow.Fwd_IAT)
-                    flow.Fwd_IAT_total = np.sum(flow.Fwd_IAT)
-
-                    flow.packet_length_mean = np.mean(flow.packet_length)
-                    flow.max_packet_length = max(flow.packet_length)
-                    flow.packet_length_std = np.std(flow.packet_length)
-                    flow.packet_length_var = flow.packet_length_std * flow.packet_length_std
-
-                    if flow.bwd_packet_length:
-                        flow.bwd_packet_length_max = max(flow.bwd_packet_length)
-                        flow.bwd_packet_length_mean = np.mean(flow.bwd_packet_length)
-                        flow.bwd_packet_length_std = np.std(flow.bwd_packet_length)
-                        
-                    print(flow.identity, flow.fwd, flow.num_packets, flow.total_segment_length, ("Open" if flow.state else "Closed"))
+                    flow.find_features()
+                    
+                    print(flow.flow_id, flow.identity, flow.fwd, flow.num_packets, flow.total_segment_length, ("Open\n" if flow.state else "Closed\n"), flow.features)
 
             if __name__ == '__main__':
                 sys.exit()
 
-    def preprocessing(self,packet,timer):  #parse header data
+    def preprocessing(self, packet, timer):  #parse header data
         ethernet_header= packet[0:14]
         ethernet_header = struct.unpack('!6s6sH',ethernet_header)
 
@@ -209,12 +243,15 @@ class Sniffer:
                             break
 
                     else:
-                        FLOWS[identity].append(Flow(identity, source_ip, flags, timer, packet_length, segment_length))
+                        self.n_flows += 1
+                        FLOWS[identity].append(Flow(self.n_flows, identity, source_ip, flags, timer, packet_length, segment_length))
 
                 else:
-                    FLOWS[identity] = [Flow(identity, source_ip, flags, timer, packet_length, segment_length),]
+                    self.n_flows += 1
+                    FLOWS[identity] = [Flow(self.n_flows, identity, source_ip, flags, timer, packet_length, segment_length),]
 
                 lock.release()
 
 if __name__ == '__main__':
+    #time.sleep(10)
     sniff = Sniffer()
