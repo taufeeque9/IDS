@@ -107,8 +107,9 @@ class Sniffer:
 
         self.threads = []
         try:
-            if(system() == 'Windows'):
+            if (system() == 'Windows'):
                 self.sock = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IP)
+                self.sock.bind((MY_IP[0], 0))
                 self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_HDRINCL, 1)
                 self.sock.ioctl(socket.SIO_RCVALL, socket.RCVALL_ON)
 
@@ -171,7 +172,7 @@ class Sniffer:
         ethernet_header = struct.unpack('!6s6sH',ethernet_header)
 
         protocol = socket.ntohs(ethernet_header[2])
-        if protocol == 8:  #ip . 1544 for arp
+        if (((protocol == 8) and (system() == 'Linux')) or ((protocol == 43200) and (system() == 'Windows'))):  #ip . 1544 for arp
             ip_header = packet[14:34]
             ip_header = struct.unpack('!BB3HBBH4s4s',ip_header)
             
