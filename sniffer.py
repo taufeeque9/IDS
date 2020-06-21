@@ -128,9 +128,7 @@ class Flow:
 FLOWS = {}    #can map (ip1,port1,ip2,port2) to list of Flow objects
 
 class Sniffer:
-    def __init__(self):
-        sniffer_thread = threading.current_thread()
-        sniffer_thread.alive = True
+    def __init__(self, queue = 0):
 
         self.threads = []
         self.n_flows = 0  #will help in assigning flow IDs
@@ -153,33 +151,15 @@ class Sniffer:
                 sys.exit()
 
         try:
-            while sniffer_thread.alive:
+            while 1:
                 packet = self.sock.recvfrom(2048)
                 timer = time.time() - self.starttime
 
                 if packet[1][0] != 'lo':   #Don't need to sniff local interface for malicious packets(??)
-                    t = threading.Thread(target=self.preprocessing,args=(packet[0],timer))
+                    t = threading.Thread(target=self.preprocessing,args=(packet[0], timer, queue))
                     t.start()
                     self.threads.append(t)
 
-            if system() == 'Windows':
-                self.sock.ioctl(socket.SIO_RCVALL, socket.RCVALL_OFF)
-            
-            self.sock.close()
-            
-            print("Flows")
-
-            for thread in self.threads:
-                thread.join()
-
-            for identity in FLOWS:
-                for flow in FLOWS[identity]:
-                    flow.find_features()
-                        
-                    print(flow.flow_id, flow.identity, flow.fwd, flow.num_packets, flow.total_segment_length, ("Open" if flow.state else "Closed"))
-
-            if __name__ == '__main__':
-                sys.exit()
         except KeyboardInterrupt:   #break the loop , close and dump all data into file
             print("\nKeyboard Interrupt! Closing socket")
 
@@ -195,13 +175,15 @@ class Sniffer:
             for identity in FLOWS:
                 for flow in FLOWS[identity]:
                     flow.find_features()
+                    if queue != 0:
+                        queue.put(flow)
                     
                     print(flow.flow_id, flow.identity, flow.fwd, flow.num_packets, flow.total_segment_length, ("Open\n" if flow.state else "Closed\n"), flow.features)
 
             if __name__ == '__main__':
                 sys.exit()
 
-    def preprocessing(self, packet, timer):  #parse header data
+    def preprocessing(self, packet, timer, queue):  #parse header data
         ethernet_header= packet[0:14]
         ethernet_header = struct.unpack('!6s6sH',ethernet_header)
 
@@ -240,6 +222,10 @@ class Sniffer:
                     for flow in FLOWS[identity]:
                         if flow.state: #flow is active
                             flow.add_packet(identity, source_ip, flags, timer, packet_length, segment_length)
+
+                            if queue != 0:   #queue exists
+                                queue.put(flow)  #send the flow for analysis the moment a packet(not the first) arrives
+
                             break
 
                     else:
