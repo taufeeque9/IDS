@@ -5,10 +5,10 @@ import pickle
 import threading
 import numpy as np
 from copy import deepcopy
-from keras.models import load_model
+# from keras.models import load_model
+import joblib
 
-
-model = load_model("model.h5")  #assuming keras nn. Can change this if some other kind of model is used.
+model = joblib.load("extratrees.sav")  
 
 bad_flows = []
 
@@ -24,7 +24,7 @@ def detect_intrusion(flow):
         print("Possible intrusion detected with a probability of " + str(chances *100) + '%')
         print("Flow parameters:")
         print("Hosts and ports :", flow.identity, "Flow timestamp:", flow.timestamp, "Flow Duration:", flow.flow_duration)
-        
+
         lock.acquire()
         for i in range(len(bad_flows)):  #update bad flows with latest data
             if bad_flows[i].flow_id == flow.flow_id:
@@ -42,20 +42,21 @@ def main():
     sniffer_process = mp.Process(target = sniffer.Sniffer, args = (queue,), daemon= True)
     sniffer_process.start()
     try:
-        while 1:
-            flow = queue.get()
-            flow = deepcopy(flow)   #analyze the flow at the state at the time it was recieved
+        while True:
+            if not queue.empty():
+                flow = queue.get()
+                flow = deepcopy(flow)   #analyze the flow at the state at the time it was recieved
 
-            thread = threading.Thread(target = detect_intrusion, args = (flow,), daemon = True)
-            thread.start()
-            threads.append(thread)
+                thread = threading.Thread(target = detect_intrusion, args = (flow,), daemon = True)
+                thread.start()
+                threads.append(thread)
 
     except KeyboardInterrupt:
         sniffer_process.join()   #wait for the sniffer process to end
 
         while not queue.empty():
             flow = queue.get()
-            flow = deepcopy(flow) 
+            flow = deepcopy(flow)
 
             thread = threading.Thread(target = detect_intrusion, args = (flow,), daemon = True)
             thread.start()
@@ -69,7 +70,7 @@ def main():
         bad_flows = bad_flows[::-1]  #latest bad flow first
 
         try:
-            file = open('bad_flows', 'rb')
+            file = open('bad_flows.pkl', 'rb')
             old_bad_flows = pickle.load(file)
             file.close()
 
@@ -78,7 +79,7 @@ def main():
         except:  #file doesn't exist
             pass
 
-        file = open('bad_flows', 'wb')
+        file = open('bad_flows.pkl', 'wb')
         pickle.dump(bad_flows, file)
         file.close()
 
