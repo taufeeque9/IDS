@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 MY_IP = [socket.gethostbyname(socket.gethostname()),]
-#Tou can try socket.getfqdn() if the above method gives '127.0.0.1'
+#You can try socket.getfqdn() if the above method gives '127.0.0.1'
 
 if system() == 'Linux':
     MY_IP = set()
@@ -205,7 +205,7 @@ class Sniffer:
                 source_port , dest_port = tcp_header[0] , tcp_header[1]
 
                 identity = ((source_ip, source_port) , (dest_ip, dest_port))
-                identity = (min(identity[0] ,identity[1]) ,max(identity[0] ,identity[1])) #sort in order to club packets flowing in either direction
+    
 
                 tcp_header_length = (tcp_header[4] >> 4) * 4
                 flags = tcp_header[5]
@@ -214,8 +214,8 @@ class Sniffer:
                 segment_length = tcp_header_length + data_length
                 packet_length = ip_header_length + segment_length
 
-                print(identity , format(flags ,'b').zfill(8) , data_length , timer, ("Incoming" if (source_ip in MY_IP) else "Outgoing"))
-
+                print(identity , format(flags ,'b').zfill(8) , data_length , timer, ("Outgoing" if (source_ip in MY_IP) else "Incoming"))
+                identity = (min(identity[0] ,identity[1]) ,max(identity[0] ,identity[1])) #sort in order to club packets flowing in either direction
                 lock.acquire()
 
                 if identity in FLOWS:
@@ -235,6 +235,8 @@ class Sniffer:
                 else:
                     self.n_flows += 1
                     FLOWS[identity] = [Flow(self.n_flows, identity, source_ip, flags, timer, packet_length, segment_length),]
+
+                
 
                 lock.release()
 

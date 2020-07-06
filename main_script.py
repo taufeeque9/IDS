@@ -7,7 +7,6 @@ import numpy as np
 from copy import deepcopy
 # from keras.models import load_model
 import joblib
-
 model = joblib.load("extratrees.sav")  
 
 bad_flows = []
@@ -19,11 +18,9 @@ def detect_intrusion(flow):
     flow.find_features()
     features = (np.array(flow.features)).reshape((1, len(flow.features)))
     chances = (model.predict_proba(features))[0, 0]
-
-    if chances > 0.5:   #can change this threshold to a different value
-        print("Possible intrusion detected with a probability of " + str(chances *100) + '%')
-        print("Flow parameters:")
-        print("Hosts and ports :", flow.identity, "Flow timestamp:", flow.timestamp, "Flow Duration:", flow.flow_duration)
+    if chances > 0.8:   #can change this threshold to a different value
+        print("Possible intrusion detected with a probability of " + str(chances *100) + '%' + "\nHosts and ports :", flow.identity, "Flow timestamp:", flow.timestamp, "Flow Duration:", flow.flow_duration )
+        #print("Hosts and ports :", flow.identity, "Flow timestamp:", flow.timestamp, "Flow Duration:", flow.flow_duration)
 
         lock.acquire()
         for i in range(len(bad_flows)):  #update bad flows with latest data
@@ -38,7 +35,6 @@ def detect_intrusion(flow):
 
 def main():
     queue = mp.Queue()
-
     sniffer_process = mp.Process(target = sniffer.Sniffer, args = (queue,), daemon= True)
     sniffer_process.start()
     try:
@@ -84,5 +80,5 @@ def main():
         file.close()
 
 
-if __name__ == '__main':
+if __name__ == '__main__':
     main()
