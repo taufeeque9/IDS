@@ -34,7 +34,7 @@ class Flow:
     def __init__(self, flow_id, identity, src_ip, flags, timer, packet_length, segment_length):
         self.timestamp = time.ctime()
         self.flow_id = flow_id
-        self.features = []
+        self.features = {}       #dictionary of features
 
         self.state = True  #connection open/active
         self.identity = identity
@@ -119,10 +119,14 @@ class Flow:
             self.bwd_packet_length_mean = np.mean(self.bwd_packet_length)
             self.bwd_packet_length_std = np.std(self.bwd_packet_length)
 
-        self.features = [self.destination_port, self.flow_duration, self.bwd_packet_length_max, self.bwd_packet_length_mean]
-        self.features = self.features + [self.bwd_packet_length_std, self.flow_IAT_Max, self.Fwd_IAT_total, self.Fwd_IAT_std]
-        self.features = self.features + [self.Fwd_IAT_Max, self.max_packet_length, self.packet_length_mean, self.packet_length_std]
-        self.features = self.features + [self.packet_length_var, self.psh_flag_count, self.urg_flag_count, self.avg_bwd_segment_size]
+        self.features = {'Destination Port' : self.destination_port, 'Flow Duration' : self.flow_duration}
+        self.features.update({'Bwd Packet Length Max' : self.bwd_packet_length_max, 'Bwd Packet Length Mean' : self.bwd_packet_length_mean})
+        self.features.update({'Bwd Packet Length Std' : self.bwd_packet_length_std, 'Flow IAT Max' : self.flow_IAT_Max})
+        self.features.update({'Fwd IAT Total' : self.Fwd_IAT_total, 'Fwd IAT Std' : self.Fwd_IAT_std})
+        self.features.update({'Fwd IAT Max' : self.Fwd_IAT_Max, 'Max Packet Length' : self.max_packet_length})
+        self.features.update({'Packet Length Mean' : self.packet_length_mean, 'Packet Length Std' : self.packet_length_std})
+        self.features.update({'Packet Length Variance' : self.packet_length_var, 'PSH Flag Count' : self.psh_flag_count})
+        self.features.update({'URG Flag Count' : self.urg_flag_count, 'Avg Bwd Segment Size' : self.avg_bwd_segment_size})
 
 
 FLOWS = {}    #can map (ip1,port1,ip2,port2) to list of Flow objects

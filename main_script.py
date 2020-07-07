@@ -17,7 +17,7 @@ lock = threading.Lock()   #This lock is local to the parent process. It won't af
 def detect_intrusion(flow):
     flow.find_features()
     features = (np.array(flow.features)).reshape((1, len(flow.features)))
-    chances = (model.predict_proba(features))[0, 0]
+    chances = (model.predict_proba(features))[0, 1]      #Since prob of class-1 is prob of intrusion
     if chances > 0.8:   #can change this threshold to a different value
         print("Possible intrusion detected with a probability of " + str(chances *100) + '%' + "\nHosts and ports :", flow.identity, "Flow timestamp:", flow.timestamp, "Flow Duration:", flow.flow_duration )
         #print("Hosts and ports :", flow.identity, "Flow timestamp:", flow.timestamp, "Flow Duration:", flow.flow_duration)
@@ -39,13 +39,12 @@ def main():
     sniffer_process.start()
     try:
         while True:
-            if not queue.empty():
-                flow = queue.get()
-                flow = deepcopy(flow)   #analyze the flow at the state at the time it was recieved
+            flow = queue.get()
+            flow = deepcopy(flow)   #analyze the flow at the state at the time it was recieved
 
-                thread = threading.Thread(target = detect_intrusion, args = (flow,), daemon = True)
-                thread.start()
-                threads.append(thread)
+            thread = threading.Thread(target = detect_intrusion, args = (flow,), daemon = True)
+            thread.start()
+            threads.append(thread)
 
     except KeyboardInterrupt:
         sniffer_process.join()   #wait for the sniffer process to end
