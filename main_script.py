@@ -21,8 +21,8 @@ def detect_intrusion(flow):
     flow.find_features()
     feats = [flow.features[feat] for feat in flist]
     features = (np.array(feats)).reshape((1, len(flist)))
-    chances = (model.predict_proba(features))[0, 1]  # Since prob of class-1 is prob of intrusion
-    if chances > 0.6:  # can change this threshold to a different value
+    pred_class = model.predict(features)  # Since prob of class-1 is prob of intrusion
+    if pred_class == 1:  # can change this threshold to a different value
         print("Possible intrusion detected with a probability of " + str(chances * 100) + '%' + "\nHosts and ports :",
               flow.identity, "Flow timestamp:", flow.timestamp, "Flow Duration:", flow.flow_duration)
         # print("Hosts and ports :", flow.identity, "Flow timestamp:", flow.timestamp, "Flow Duration:", flow.flow_duration)
