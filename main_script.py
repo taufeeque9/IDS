@@ -38,51 +38,53 @@ def detect_intrusion(flow):
         lock.release()
 
 
-def main():
-    queue = mp.Queue()
-    sniffer_process = mp.Process(target=sniffer.Sniffer, args=(queue,), daemon=True)
-    sniffer_process.start()
-    try:
-        while True:
-            flow = queue.get()
-            flow = deepcopy(flow)  # analyze the flow at the state at the time it was recieved
+#def main():
+queue = mp.Queue()
+sniffer_process = mp.Process(target=sniffer.Sniffer, args=(queue,), daemon=True)
+sniffer_process.start()
+try:
+	while True:
+	    flow = queue.get()
+	    flow = deepcopy(flow)  # analyze the flow at the state at the time it was recieved
 
-            thread = threading.Thread(target=detect_intrusion, args=(flow,), daemon=True)
-            thread.start()
-            threads.append(thread)
+	    thread = threading.Thread(target=detect_intrusion, args=(flow,), daemon=True)
+	    thread.start()
+	    threads.append(thread)
 
-    except KeyboardInterrupt:
-        sniffer_process.join()  # wait for the sniffer process to end
+except KeyboardInterrupt:
+	sniffer_process.join()  # wait for the sniffer process to end
 
-        while not queue.empty():
-            flow = queue.get()
-            flow = deepcopy(flow)
+	while not queue.empty():
+	    flow = queue.get()
+	    flow = deepcopy(flow)
 
-            thread = threading.Thread(target=detect_intrusion, args=(flow,), daemon=True)
-            thread.start()
-            threads.append(thread)
+	    thread = threading.Thread(target=detect_intrusion, args=(flow,), daemon=True)
+	    thread.start()
+	    threads.append(thread)
 
-        queue.close()
+	queue.close()
 
-        for Thread in threads:
-            Thread.join()
+	for Thread in threads:
+	    Thread.join()
+	    
+	print("Number of bad flows", len(bad_flows))
 
-        bad_flows = bad_flows[::-1]  # latest bad flow first
+	bad_flows = bad_flows[::-1]  # latest bad flow first
 
-        try:
-            file = open('bad_flows.pkl', 'rb')
-            old_bad_flows = pickle.load(file)
-            file.close()
+	try:
+	    file = open('bad_flows.pkl', 'rb')
+	    old_bad_flows = pickle.load(file)
+	    file.close()
 
-            bad_flows = bad_flows + old_bad_flows
+	    bad_flows = bad_flows + old_bad_flows
 
-        except:  # file doesn't exist
-            pass
+	except:  # file doesn't exist
+	    pass
 
-        file = open('bad_flows.pkl', 'wb')
-        pickle.dump(bad_flows, file)
-        file.close()
+	file = open('bad_flows.pkl', 'wb')
+	pickle.dump(bad_flows, file)
+	file.close()
 
 
-if __name__ == '__main__':
-    main()
+#if __name__ == '__main__':
+#    main()
